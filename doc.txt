@@ -1,0 +1,239 @@
+【メモ】Reduxの挙動を理解する
+http://loveovererror.com/wp/%E3%80%90%E3%83%A1%E3%83%A2%E3%80%91redux%E3%81%AE%E6%8C%99%E5%8B%95%E3%82%92%E7%90%86%E8%A7%A3%E3%81%99%E3%82%8B/
+JavaScript
+ 2021.02.12
+目次
+はじめに
+Reduxとは
+Reduxの3原則
+サンプルプログラム
+概要
+フォルダ構成
+ソースコード
+Actions
+Reducer
+index.js
+Appコンポーネント
+最後に
+はじめに
+この記事は、私がReduxを勉強し始めた時に、関数や各ファイルの挙動をイメージすることが難しかったため、少しでもReduxの理解に苦しんでる方の助けになればと思い投稿しています。
+
+また、私自身も初心者のため、内容に誤りがありましたらご指摘いただければ幸いです。
+
+Reduxとは
+まずざっくりした私のReduxの認識ですが、（本当にざっくりですが。。）
+
+「Reduxとは、アプリケーションの状態（state）を各コンポーネントのstateとして管理するのではなく、1アプリケーションに唯一無二で存在するstoreにより管理することで、子コンポーネントや孫コンポーネントへpropsのバケツリレーで状態を共有する必要が無くなり、コードが簡潔に書けるようになる状態管理ライブラリー」
+
+といった認識です。
+
+Reduxの3原則
+Reduxには3原則というReduxの実装を行う上で守るべきルールがあります。
+
+ここでは簡単に触れておきますが、詳しくは公式ドキュメントなど調べてみてください。
+
+第一原則：Single source of truth
+「アプリ全体で一つだけのstoreを持ち、それにより状態は管理されるべきである」
+第二原則：State is read-only
+「アプリの状態は読み取り専用であり、各コンポーネントから直接更新されるべきではない。stateを更新したい場合はActionを発行することによりstore自身にstateを更新してもらうべきである」
+第三原則：Changes are made with pure functions
+「stateを更新する関数は純粋関数であるべきである」
+上記の理由により、これまでReactの各コンポーネントの「state」や「props」で管理していた情報はすべて、「store」さんにお願いすることになります。
+
+「store」さんには初めにReducerという指示書のようなものを渡しておき、stateを取得/更新したいコンポーネントでActionを発行する形になります。
+
+サンプルプログラム
+概要
+インプットにテキストを入力しADDボタンを押せばTODOが登録され、Deleteボタンを押せば削除されるというシンプルなTODOリストです。
+
+
+
+↓↓↓
+
+
+
+↓↓↓
+
+
+
+以下はReduxを導入したTodoリストのサンプルコードです。
+
+フォルダ構成
+========================|
+srcフォルダ
+–index.js
+–App.js
+–actionsフォルダ
+—-todoActions.js
+–reducersフォルダ
+—-todoReducer.js
+========================|
+
+ソースコード
+Actions
+todoActions.js
+
+//todoActions.js
+//※以下のAction関数は、Actionを利用するコンポーネントで読み込まれ、
+//「mapDispatchToProps」と「connect」を利用して最終的にReducerと紐づけられる。
+//今回はidのカウント用変数を用意
+let count = 0;
+//以下今回使用するActionたち。。
+export function addTodo(text) {
+  return { type: "ADD_TODO", id: count++, text };
+}
+export function deleteTodo(id) {
+  return { type: "DELETE_TODO", id: id };
+}
+export function changeText(text) {
+  return { type: "CHANGE_TEXT", text };
+}
+ 
+
+Reducer
+todoReducer.js
+
+//todoReducer.js
+//storeから現在のstateとコンポーネントから発行されたActionオブジェクトを受け取り、
+//新しいstateをstoreにreturnすることでstateを変更する関数。
+//※index.jsでStoreを作成する際の引数になる
+//stateの初期値を定義
+//（todoリスト格納用の配列と、インプットテキストのvalue管理用）
+const initState = { todos: [], text: "" };
+//Reducerを作成
+//初期値にinitStateを渡し、
+//stateとactionを引数にとる形でstoreから利用できるように関数を作成する。
+//注１※戻り値はイミュータブルな値でreturnする。
+//（注１ stateがオブジェクトや配列の場合、元のstateを書き換えずに新しいデータを返す。）
+const todoReducer = (state = initState, action) => {
+  switch (action.type) {
+    case "ADD_TODO":
+      return {
+        ...state,
+        todos: [
+          ...state.todos,
+          {
+            id: action.id,
+            text: action.text,
+          },
+        ],
+      };
+    case "DELETE_TODO":
+      return {
+        ...state,
+        todos: state.todos.filter((todo) => todo.id != action.id),
+      };
+    case "CHANGE_TEXT":
+      return {
+        ...state,
+        todos: [...state.todos],
+        text: action.text,
+      };
+    default:
+      return state;
+  }
+};
+//Reducerをエクスポート
+export default todoReducer;
+index.js
+index.js
+
+//index.js
+import React from "react";
+import ReactDOM from "react-dom";
+//このアプリのstateを管理するstoreを作成するためcreateStoreをインポートする
+import { createStore } from "redux";
+//このアプリのstateを各コンポーネント間で共有するためProviderをインポートする
+import { Provider } from "react-redux";
+//作成したReducerのインポート
+import todoReducer from "./reducers/todoReducer";
+//Appのインポート
+import App from "./App";
+//createStoreでstoreを作成。引数にReducerを渡す。
+//第２引数はブラウザでRedux-devtoolを利用するための記述
+const store = createStore(
+  todoReducer,
+  window.__REDUX_DEVTOOLS_EXTENSION__ && window.__REDUX_DEVTOOLS_EXTENSION__()
+);
+//Providerに作成したstoreを渡しAppを囲むことでstateの共有準備完了
+ReactDOM.render(
+  <Provider store={store}>
+    <App />
+  </Provider>,
+  document.getElementById("root")
+);
+Appコンポーネント
+App.js
+
+//App.js
+//ReduxのstateとReactコンポーネントを紐づけるためにconnectをインポート
+import { connect } from "react-redux";
+//作成したActionをインポート
+import { addTodo, deleteTodo, changeText } from "./actions/todoActions";
+//Appコンポーネントを定義
+//後段で「mapStateToProps」「mapDispatchToProps」「connect」によりstoreと紐づけているため、
+//props.〇〇の形でこのアプリのstoreにアクセスできる。
+function App(props) {
+  //Todo追加用の関数
+  function clickAddTodo() {
+    props.addTodo(props.text);
+  }
+  //Todo削除用の関数
+  function clickDeleteTodo(id) {
+    props.deleteTodo(id);
+  }
+  //inputの変更時にstoreにstate変更を要求するためのActionを発行する関数
+  function changeInputText(e) {
+    props.changeText(e.target.value);
+  }
+  return (
+    <div className="App">
+      <input
+        type="text"
+        value={props.text}
+        onChange={(e) => changeInputText(e)}
+      />
+      <button onClick={() => clickAddTodo()}>Add</button>
+      <ul>
+        {props.todos.map((todo) => {
+          return (
+            <li key={todo.id}>
+              {todo.id} {todo.text}
+              <button onClick={() => clickDeleteTodo(todo.id)}>Delete</button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+//このアプリのstateをこのコンポーネントのpropsとして利用できるようにマッピングする関数
+//（connectの第一引数）
+const mapStateToProps = (state) => {
+  return {
+    todos: state.todos,
+    text: state.text,
+  };
+};
+//このアプリのstateをこのコンポーネントから変更要求出来るようにするためにActionと紐づけを行う関数
+//（connectの第二引数）
+const mapDispatchToProps = (dispatch) => {
+  return {
+    addTodo: (text) => dispatch(addTodo(text)), 
+    //↑↑結果的にはAppコンポーネントの中でprops.addTodoの形で利用することができ、
+    //実行された際は、storeのdispatch関数の引数にActionオブジェクトが入り、
+    //dispatch({ type: "ADD_TODO", id: count++, text })となる。※todoActions.js参照
+    deleteTodo: (id) => dispatch(deleteTodo(id)),
+    changeText: (text) => dispatch(changeText(text)),
+  };
+};
+//storeと紐づけをするためにApp本体ではなく、connect関数をエクスポートする
+export default connect(mapStateToProps, mapDispatchToProps)(App);
+//このコンポーネントがstateの書き換えを必要としない場合（storeの状態を見るだけの場合）は、第二引数は省略可
+//例) export default connect(mapStateToProps)(App);
+//このコンポーネントがstateの書き換えのみを行う場合（storeにActionを発行するだけの場合）は、第一引数にnullを渡す
+//例) export default connect(null, mapDispatchToProps)(App);
+最後に
+最後まで読んでいただきありがとうございました。
+
+以上、Reduxの挙動の理解に苦しんだ時のメモでした。
